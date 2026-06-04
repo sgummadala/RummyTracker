@@ -27,43 +27,72 @@ struct AddPlayersView: View {
                 inputRow
                     .padding(.horizontal)
                     .padding(.top, 16)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 14)
 
-                // Recent player chips
-                if !suggestions.isEmpty {
-                    recentPlayersRow
-                        .padding(.bottom, 8)
-                }
-
-                // Player count header
-                if !players.isEmpty {
-                    HStack {
-                        Text("\(players.count) added")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white.opacity(0.65))
-                        Spacer()
-                        Text("\(activeCount) in game")
-                            .font(.caption.bold())
-                            .foregroundStyle(t.gold)
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 6)
-                }
-
-                // Player list — List expands to fill remaining space
+                // Player list (fills all remaining space)
                 List {
-                    ForEach(Array(players.enumerated()), id: \.element.id) { index, _ in
-                        playerRow(index: index)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                    // Recent Players section
+                    if !suggestions.isEmpty {
+                        Section {
+                            ForEach(suggestions, id: \.self) { name in
+                                Button {
+                                    players.append(PlayerEntry(name: name))
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .foregroundStyle(t.gold)
+                                            .font(.title3)
+                                        Text(name)
+                                            .font(.headline)
+                                            .foregroundStyle(.white)
+                                        Spacer()
+                                        Text("Add")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(t.gold)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .listRowBackground(Color.white.opacity(0.08))
+                                .listRowSeparator(.hidden)
+                            }
+                        } header: {
+                            Text("Recent Players")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white.opacity(0.65))
+                                .textCase(nil)
+                        }
                     }
-                    .onDelete { players.remove(atOffsets: $0) }
+
+                    // Added players section
+                    if !players.isEmpty {
+                        Section {
+                            ForEach(players, id: \.id) { player in
+                                playerRow(player: player)
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                            }
+                            .onDelete { offsets in
+                                players.remove(atOffsets: offsets)
+                            }
+                        } header: {
+                            HStack {
+                                Text("\(players.count) added")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.white.opacity(0.65))
+                                Spacer()
+                                Text("\(activeCount) in game")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(t.gold)
+                            }
+                            .textCase(nil)
+                        }
+                    }
                 }
-                .listStyle(.plain)
+                .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
 
-                // Continue button
+                // Rules button
                 continueButton
                     .padding(.horizontal)
                     .padding(.top, 10)
@@ -104,77 +133,53 @@ struct AddPlayersView: View {
         }
     }
 
-    private var recentPlayersRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Recent Players")
-                .font(.caption.bold())
-                .foregroundStyle(.white.opacity(0.65))
-                .padding(.horizontal)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(suggestions, id: \.self) { name in
-                        Button {
-                            players.append(PlayerEntry(name: name))
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "plus.circle.fill").font(.caption2)
-                                Text(name).font(.subheadline.bold())
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14).padding(.vertical, 8)
-                            .background(Color.white.opacity(0.15))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
-                        }
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
+    private func playerRow(player: PlayerEntry) -> some View {
+        // Safe index lookup — avoids crash when delete animates
+        let index = players.firstIndex(where: { $0.id == player.id })
 
-    private func playerRow(index: Int) -> some View {
-        let player = players[index]
-        let bgFill: Color = player.isActive ? Color.red.opacity(0.22) : Color.white.opacity(0.06)
-        let borderColor: Color = player.isActive ? Color.pink.opacity(0.7) : Color.white.opacity(0.15)
+        let isActive = index.map { players[$0].isActive } ?? player.isActive
+        let bgFill: Color = isActive ? Color.red.opacity(0.22) : Color.white.opacity(0.06)
+        let borderColor: Color = isActive ? Color.pink.opacity(0.7) : Color.white.opacity(0.15)
+        let displayIndex = (index ?? 0) + 1
+
         return HStack(spacing: 14) {
             // Number badge
             ZStack {
                 Circle()
-                    .fill(player.isActive ? t.gold.opacity(0.25) : Color.white.opacity(0.08))
+                    .fill(isActive ? t.gold.opacity(0.25) : Color.white.opacity(0.08))
                     .frame(width: 36, height: 36)
-                Text("\(index + 1)")
+                Text("\(displayIndex)")
                     .font(.subheadline.bold())
-                    .foregroundStyle(player.isActive ? t.gold : .white.opacity(0.4))
+                    .foregroundStyle(isActive ? t.gold : .white.opacity(0.4))
             }
 
             // Name
             Text(player.name)
                 .font(.title3.bold())
-                .foregroundStyle(player.isActive ? .white : .white.opacity(0.35))
-                .strikethrough(!player.isActive, color: .white.opacity(0.35))
+                .foregroundStyle(isActive ? .white : .white.opacity(0.35))
+                .strikethrough(!isActive, color: .white.opacity(0.35))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // In/Out toggle
+            // Toggle with In/Out label
             VStack(spacing: 2) {
                 Toggle("", isOn: Binding(
-                    get: { players[index].isActive },
-                    set: { players[index].isActive = $0 }
+                    get: { index.map { players[$0].isActive } ?? false },
+                    set: { val in if let i = index { players[i].isActive = val } }
                 ))
                 .labelsHidden()
                 .tint(t.gold)
-                Text(player.isActive ? "In" : "Out")
+                Text(isActive ? "In" : "Out")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(player.isActive ? t.gold : .white.opacity(0.4))
+                    .foregroundStyle(isActive ? t.gold : .white.opacity(0.4))
             }
 
             // Delete button
             Button {
-                withAnimation { _ = players.remove(at: index) }
+                if let i = index { players.remove(at: i) }
             } label: {
                 Image(systemName: "trash.fill")
                     .font(.subheadline)
-                    .foregroundStyle(.red.opacity(0.75))
+                    .foregroundStyle(Color.red.opacity(0.75))
             }
         }
         .padding(.horizontal, 16)
