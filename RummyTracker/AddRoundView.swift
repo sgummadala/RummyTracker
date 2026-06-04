@@ -64,36 +64,40 @@ struct AddRoundView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    if !outPlayers.isEmpty { outSection }
-                    ForEach(activePlayers, id: \.self) { name in
-                        playerCard(for: name)
+        ZStack {
+            Theme.gradient.ignoresSafeArea()
+
+            NavigationStack {
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(spacing: 14) {
+                        if !outPlayers.isEmpty { outSection }
+                        ForEach(activePlayers, id: \.self) { name in
+                            playerCard(for: name)
+                        }
+                        if allValid && winnerCount != 1 { warningBanner }
+                        Color.clear.frame(height: 32)
                     }
-                    if allValid && winnerCount != 1 { warningBanner }
+                    .padding(.horizontal)
+                    .padding(.top, 14)
                 }
-                .padding()
-                .padding(.bottom, 20)
+                .navigationTitle(editingRound == nil ? "Add Round" : "Edit Round")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(.clear, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .foregroundStyle(.white)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(editingRound == nil ? "Save" : "Update") { saveRound() }
+                            .foregroundStyle(allValid ? Theme.gold : .white.opacity(0.4))
+                            .fontWeight(.bold)
+                            .disabled(!allValid)
+                    }
+                }
+                .onAppear { prepopulate() }
             }
-            .background(Theme.gradient.ignoresSafeArea())
-            .navigationTitle(editingRound == nil ? "Add Round" : "Edit Round")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.clear, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(.white)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(editingRound == nil ? "Save" : "Update") { saveRound() }
-                        .foregroundStyle(allValid ? Theme.gold : .white.opacity(0.4))
-                        .fontWeight(.bold)
-                        .disabled(!allValid)
-                }
-            }
-            .onAppear { prepopulate() }
         }
     }
 
