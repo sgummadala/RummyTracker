@@ -2,11 +2,18 @@ import SwiftUI
 
 struct AddPlayersView: View {
     @Binding var players: [PlayerEntry]
+    @Environment(GameStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     var onContinue: () -> Void
 
     @State private var inputName = ""
     @FocusState private var fieldFocused: Bool
+
+    private var suggestions: [String] {
+        store.savedPlayerNames.filter { name in
+            !players.map(\.name).contains(name)
+        }
+    }
 
     private var canContinue: Bool {
         players.filter(\.isActive).filter { !$0.name.isEmpty }.count >= 2
@@ -43,6 +50,39 @@ struct AddPlayersView: View {
                     .disabled(inputName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 .padding(.horizontal)
+
+                // Saved player chips
+                if !suggestions.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recent Players")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white.opacity(0.7))
+                            .padding(.horizontal)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(suggestions, id: \.self) { name in
+                                    Button {
+                                        players.append(PlayerEntry(name: name))
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "plus.circle.fill")
+                                                .font(.caption)
+                                            Text(name)
+                                                .font(.subheadline.bold())
+                                        }
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(Color.white.opacity(0.15))
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
 
                 // Player list
                 ScrollView {

@@ -77,9 +77,12 @@ struct Game: Codable, Identifiable, Hashable, Sendable {
 @MainActor
 class GameStore {
     var games: [Game] = []
-    private let storageKey = "rummy_games_v1"
+    var savedPlayerNames: [String] = []
 
-    init() { load() }
+    private let storageKey = "rummy_games_v1"
+    private let playersKey = "rummy_saved_players"
+
+    init() { load(); loadPlayerNames() }
 
     var activeGame: Game? { games.first(where: { !$0.isComplete }) }
 
@@ -88,7 +91,11 @@ class GameStore {
             games[i].isComplete = true
         }
         games.insert(Game(playerNames: playerNames, rules: rules), at: 0)
+        for name in playerNames where !savedPlayerNames.contains(name) {
+            savedPlayerNames.append(name)
+        }
         save()
+        savePlayerNames()
     }
 
     func addRound(to gameId: UUID, scores: [String: Int]) {
@@ -134,5 +141,13 @@ class GameStore {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let decoded = try? JSONDecoder().decode([Game].self, from: data) else { return }
         games = decoded
+    }
+
+    private func savePlayerNames() {
+        UserDefaults.standard.set(savedPlayerNames, forKey: playersKey)
+    }
+
+    private func loadPlayerNames() {
+        savedPlayerNames = UserDefaults.standard.stringArray(forKey: playersKey) ?? []
     }
 }

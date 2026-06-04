@@ -23,6 +23,7 @@ struct GameView: View {
 
             VStack(spacing: 0) {
                 scoreTable(game: game)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Spacer()
             }
         }
@@ -78,148 +79,132 @@ struct GameView: View {
     @ViewBuilder
     private func scoreTable(game: Game) -> some View {
         let totals = game.totalScores
-        let players = game.playerNames
-        let needsScroll = players.count > Theme.maxPlayersWithoutScroll
 
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
-                Section {
-                    // Round rows
-                    if game.rounds.isEmpty {
-                        emptyState
-                    } else {
-                        ForEach(Array(game.rounds.enumerated()), id: \.element.id) { index, round in
-                            if needsScroll {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    roundRowContent(game: game, round: round, index: index)
+        GeometryReader { geo in
+            let rdW: CGFloat = 46
+            let pW: CGFloat = max(44, (geo.size.width - rdW) / CGFloat(game.playerNames.count))
+
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
+                    Section {
+                        if game.rounds.isEmpty {
+                            emptyState
+                        } else {
+                            ForEach(Array(game.rounds.enumerated()), id: \.element.id) { index, round in
+                                roundRowContent(game: game, round: round, index: index, rdW: rdW, pW: pW)
+                                if index < game.rounds.count - 1 {
+                                    Divider().background(Color.white.opacity(0.2))
                                 }
-                            } else {
-                                roundRowContent(game: game, round: round, index: index)
-                            }
-                            if index < game.rounds.count - 1 {
-                                Divider().background(Color.white.opacity(0.2))
                             }
                         }
-                    }
-
-                    // Totals row
-                    if needsScroll {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            totalsRowContent(game: game, totals: totals)
+                        totalsRowContent(game: game, totals: totals, rdW: rdW, pW: pW)
+                        if game.isComplete, let winner = game.winner {
+                            winnerBanner(winner: winner, rounds: game.rounds.count)
                         }
-                    } else {
-                        totalsRowContent(game: game, totals: totals)
-                    }
-
-                    // Winner banner
-                    if game.isComplete, let winner = game.winner {
-                        winnerBanner(winner: winner, rounds: game.rounds.count)
-                    }
-                } header: {
-                    if needsScroll {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            headerRowContent(players: players, leader: game.currentLeader, isComplete: game.isComplete)
-                        }
-                    } else {
-                        headerRowContent(players: players, leader: game.currentLeader, isComplete: game.isComplete)
+                    } header: {
+                        headerRowContent(players: game.playerNames, leader: game.currentLeader,
+                                         isComplete: game.isComplete, rdW: rdW, pW: pW)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Table row content (shared between scroll and no-scroll)
+    // MARK: - Table rows
 
-    private func headerRowContent(players: [String], leader: String?, isComplete: Bool) -> some View {
+    private func headerRowContent(players: [String], leader: String?, isComplete: Bool,
+                                   rdW: CGFloat, pW: CGFloat) -> some View {
         HStack(spacing: 0) {
-            tableCell(text: "Rd.", width: Theme.rdColWidth, bg: Theme.tableNavy, bold: true)
+            tableCell(text: "Rd.", width: rdW, height: 48, bg: Theme.tableNavy, bold: true)
             ForEach(players, id: \.self) { name in
                 VStack(spacing: 2) {
-                    Text(name)
-                        .font(.subheadline.bold())
+                    Text(String(name.prefix(5)))
+                        .font(.system(size: min(13, pW * 0.22), weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                     if name == leader {
                         Image(systemName: isComplete ? "trophy.fill" : "crown.fill")
-                            .font(.caption2)
+                            .font(.system(size: 9))
                             .foregroundStyle(isComplete ? Theme.gold : .yellow)
                     }
                 }
-                .frame(width: Theme.playerColWidth)
-                .frame(height: 52)
+                .frame(width: pW, height: 48)
                 .background(Theme.tableGreen)
             }
         }
     }
 
-    private func roundRowContent(game: Game, round: Round, index: Int) -> some View {
+    private func roundRowContent(game: Game, round: Round, index: Int,
+                                  rdW: CGFloat, pW: CGFloat) -> some View {
         Button {
             guard !game.isComplete else { return }
             editingRound = round
         } label: {
             HStack(spacing: 0) {
-                VStack(spacing: 2) {
-                    Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white)
+                VStack(spacing: 1) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
                     if !game.isComplete {
-                        Image(systemName: "pencil").font(.system(size: 8)).foregroundStyle(.white.opacity(0.5))
+                        Image(systemName: "pencil")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.white.opacity(0.5))
                     }
                 }
-                .frame(width: Theme.rdColWidth, height: 52)
+                .frame(width: rdW, height: 46)
                 .background(Theme.tableNavy)
 
                 ForEach(game.playerNames, id: \.self) { name in
                     let pts = round.scores[name] ?? 0
-                    scoreCell(pts: pts, game: game, name: name, roundIndex: index)
+                    Text(pts == 0 ? "W" : "\(pts)")
+                        .font(.system(size: min(14, pW * 0.24), weight: pts == 0 ? .bold : .regular))
+                        .foregroundStyle(pts == 0 ? .green : pts >= game.rules.fullScore ? .red : .white)
+                        .frame(width: pW, height: 46)
+                        .background(index.isMultiple(of: 2) ? Theme.tableGreen : Theme.tableGreenLight)
                 }
             }
         }
         .buttonStyle(.plain)
-        .background(index.isMultiple(of: 2) ? Theme.tableGreen : Theme.tableGreenLight)
     }
 
-    private func totalsRowContent(game: Game, totals: [String: Int]) -> some View {
+    private func totalsRowContent(game: Game, totals: [String: Int],
+                                   rdW: CGFloat, pW: CGFloat) -> some View {
         HStack(spacing: 0) {
-            tableCell(text: "Tot", width: Theme.rdColWidth, bg: Theme.tableNavy, bold: true)
+            tableCell(text: "Tot", width: rdW, height: 56, bg: Theme.tableNavy, bold: true)
             ForEach(game.playerNames, id: \.self) { name in
                 let total = totals[name] ?? 0
                 let isOut = game.isPlayerOut(name)
                 let isLeader = name == game.currentLeader
-                VStack(spacing: 3) {
+                VStack(spacing: 2) {
                     Text("\(total)")
-                        .font(.headline.bold())
+                        .font(.system(size: min(15, pW * 0.24), weight: .bold))
                         .foregroundStyle(isOut ? .red : isLeader ? Theme.gold : .white)
                     if isOut {
                         Text("OUT")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .padding(.horizontal, 5).padding(.vertical, 2)
                             .background(Color.red)
                             .clipShape(Capsule())
                     } else {
                         Text("\(game.rules.gameScore - total)")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white.opacity(0.65))
                     }
                 }
-                .frame(width: Theme.playerColWidth, height: 56)
+                .frame(width: pW, height: 56)
                 .background(Theme.tableGreen)
             }
         }
     }
 
-    private func scoreCell(pts: Int, game: Game, name: String, roundIndex: Int) -> some View {
-        Text(pts == 0 ? "W" : "\(pts)")
-            .font(.subheadline.bold())
-            .foregroundStyle(pts == 0 ? .green : pts >= game.rules.fullScore ? .red : .white)
-            .frame(width: Theme.playerColWidth, height: 52)
-            .background(roundIndex.isMultiple(of: 2) ? Theme.tableGreen : Theme.tableGreenLight)
-    }
-
-    private func tableCell(text: String, width: CGFloat, bg: Color, bold: Bool = false) -> some View {
+    private func tableCell(text: String, width: CGFloat, height: CGFloat,
+                            bg: Color, bold: Bool = false) -> some View {
         Text(text)
-            .font(bold ? .subheadline.bold() : .subheadline)
+            .font(bold ? .system(size: 12, weight: .bold) : .system(size: 12))
             .foregroundStyle(.white)
-            .frame(width: width, height: 52)
+            .frame(width: width, height: height)
             .background(bg)
     }
 
