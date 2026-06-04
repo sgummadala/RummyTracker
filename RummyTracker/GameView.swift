@@ -10,17 +10,6 @@ struct GameView: View {
 
     private var game: Game? { store.games.first(where: { $0.id == gameId }) }
 
-    private func colWidth(playerCount: Int) -> CGFloat {
-        switch playerCount {
-        case 2: return 110
-        case 3: return 90
-        case 4: return 78
-        case 5: return 68
-        case 6: return 62
-        default: return 56
-        }
-    }
-
     var body: some View {
         Group {
             if let game { mainContent(game: game) }
@@ -29,32 +18,29 @@ struct GameView: View {
 
     @ViewBuilder
     private func mainContent(game: Game) -> some View {
-        let cw = colWidth(playerCount: game.playerNames.count)
+        ZStack {
+            Theme.gradient.ignoresSafeArea()
 
-        ScrollView {
-            VStack(spacing: 16) {
-                if game.isComplete { winnerCard(game: game) }
-                statsRow(game: game)
-                scoreTable(game: game, colWidth: cw)
-                    .padding(.bottom, game.isComplete ? 0 : 88)
+            VStack(spacing: 0) {
+                scoreTable(game: game)
+                Spacer()
             }
-            .padding()
         }
-        .background(Color(.systemGroupedBackground))
         .navigationTitle(navTitle(game))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             if !game.isComplete {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) { showingEndAlert = true } label: {
-                        Label("End Game", systemImage: "flag.checkered")
-                            .font(.subheadline)
+                        Image(systemName: "flag.checkered").foregroundStyle(.white)
                     }
                 }
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !game.isComplete { addRoundFAB }
+            if !game.isComplete { fabRow(game: game) }
         }
         .sheet(isPresented: $showingAddRound) {
             AddRoundView(
@@ -87,254 +73,213 @@ struct GameView: View {
             : "\(game.playerNames[0]) +\(game.playerNames.count - 1)"
     }
 
-    // MARK: - Header Cards
-
-    private func winnerCard(game: Game) -> some View {
-        HStack(spacing: 16) {
-            Text("🏆").font(.system(size: 48))
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Game Over")
-                    .font(.caption.bold())
-                    .foregroundStyle(.white.opacity(0.8))
-                if let winner = game.winner {
-                    Text("\(winner) wins!")
-                        .font(.title2.bold())
-                        .foregroundStyle(.white)
-                }
-                Text("\(game.rounds.count) rounds played")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.75))
-            }
-            Spacer()
-        }
-        .padding()
-        .background(LinearGradient(colors: [.green.opacity(0.85), .teal.opacity(0.9)],
-                                    startPoint: .topLeading, endPoint: .bottomTrailing))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .green.opacity(0.3), radius: 8, y: 4)
-    }
-
-    private func statsRow(game: Game) -> some View {
-        HStack(spacing: 10) {
-            statPill("Rounds", value: "\(game.rounds.count)", color: .indigo)
-            statPill("Out at", value: "\(RummyRules.outThreshold)", color: .red)
-            if let leader = game.currentLeader {
-                statPill(game.isComplete ? "Winner" : "Leading", value: leader, color: .green)
-            }
-        }
-    }
-
-    private func statPill(_ label: String, value: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.subheadline.bold())
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
     // MARK: - Score Table
 
     @ViewBuilder
-    private func scoreTable(game: Game, colWidth: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            // All rows share one horizontal ScrollView so they scroll in sync
-            ScrollView(.horizontal, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    tableHeader(game: game, colWidth: colWidth)
-                    Divider()
+    private func scoreTable(game: Game) -> some View {
+        let totals = game.totalScores
+        let players = game.playerNames
+        let needsScroll = players.count > Theme.maxPlayersWithoutScroll
 
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
+                Section {
+                    // Round rows
                     if game.rounds.isEmpty {
-                        emptyRoundsHint
+                        emptyState
                     } else {
                         ForEach(Array(game.rounds.enumerated()), id: \.element.id) { index, round in
-                            roundRow(game: game, round: round, index: index, colWidth: colWidth)
+                            if needsScroll {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    roundRowContent(game: game, round: round, index: index)
+                                }
+                            } else {
+                                roundRowContent(game: game, round: round, index: index)
+                            }
                             if index < game.rounds.count - 1 {
-                                Divider().padding(.leading, 48)
+                                Divider().background(Color.white.opacity(0.2))
                             }
                         }
                     }
 
-                    Divider()
-                    totalsRow(game: game, colWidth: colWidth)
-                }
-            }
-        }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.07), radius: 8, y: 3)
-    }
+                    // Totals row
+                    if needsScroll {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            totalsRowContent(game: game, totals: totals)
+                        }
+                    } else {
+                        totalsRowContent(game: game, totals: totals)
+                    }
 
-    private func tableHeader(game: Game, colWidth: CGFloat) -> some View {
-        HStack(spacing: 0) {
-            Text("#")
-                .frame(width: 48, alignment: .center)
-                .font(.caption.bold())
-                .foregroundStyle(.secondary)
-            ForEach(game.playerNames, id: \.self) { name in
-                let leader = game.currentLeader
-                VStack(spacing: 3) {
-                    Text(name)
-                        .font(.caption.bold())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    if name == leader {
-                        Image(systemName: game.isComplete ? "trophy.fill" : "crown.fill")
-                            .font(.caption2)
-                            .foregroundStyle(game.isComplete ? .yellow : .orange)
+                    // Winner banner
+                    if game.isComplete, let winner = game.winner {
+                        winnerBanner(winner: winner, rounds: game.rounds.count)
+                    }
+                } header: {
+                    if needsScroll {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            headerRowContent(players: players, leader: game.currentLeader, isComplete: game.isComplete)
+                        }
+                    } else {
+                        headerRowContent(players: players, leader: game.currentLeader, isComplete: game.isComplete)
                     }
                 }
-                .frame(width: colWidth)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 6)
-        .background(Color(.secondarySystemBackground))
     }
 
-    private var emptyRoundsHint: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "plus.circle.dashed")
-                .font(.largeTitle)
-                .foregroundStyle(.tertiary)
-            Text("No rounds yet")
-                .font(.subheadline.bold())
-                .foregroundStyle(.secondary)
-            Text("Tap Add Round below to begin")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+    // MARK: - Table row content (shared between scroll and no-scroll)
+
+    private func headerRowContent(players: [String], leader: String?, isComplete: Bool) -> some View {
+        HStack(spacing: 0) {
+            tableCell(text: "Rd.", width: Theme.rdColWidth, bg: Theme.tableNavy, bold: true)
+            ForEach(players, id: \.self) { name in
+                VStack(spacing: 2) {
+                    Text(name)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    if name == leader {
+                        Image(systemName: isComplete ? "trophy.fill" : "crown.fill")
+                            .font(.caption2)
+                            .foregroundStyle(isComplete ? Theme.gold : .yellow)
+                    }
+                }
+                .frame(width: Theme.playerColWidth)
+                .frame(height: 52)
+                .background(Theme.tableGreen)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 36)
     }
 
-    private func roundRow(game: Game, round: Round, index: Int, colWidth: CGFloat) -> some View {
+    private func roundRowContent(game: Game, round: Round, index: Int) -> some View {
         Button {
             guard !game.isComplete else { return }
             editingRound = round
         } label: {
             HStack(spacing: 0) {
                 VStack(spacing: 2) {
-                    Text("\(index + 1)")
-                        .font(.caption.bold())
-                        .foregroundStyle(.secondary)
+                    Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white)
                     if !game.isComplete {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.tertiary)
+                        Image(systemName: "pencil").font(.system(size: 8)).foregroundStyle(.white.opacity(0.5))
                     }
                 }
-                .frame(width: 48)
+                .frame(width: Theme.rdColWidth, height: 52)
+                .background(Theme.tableNavy)
 
                 ForEach(game.playerNames, id: \.self) { name in
                     let pts = round.scores[name] ?? 0
-                    let cumul = game.cumulativeScore(for: name, throughRound: index)
-                    scoreCell(pts: pts, cumulative: cumul, colWidth: colWidth)
+                    scoreCell(pts: pts, game: game, name: name, roundIndex: index)
                 }
             }
-            .padding(.vertical, 11)
-            .padding(.horizontal, 6)
-            .background(index.isMultiple(of: 2)
-                        ? Color(.systemBackground)
-                        : Color(.secondarySystemBackground).opacity(0.4))
         }
         .buttonStyle(.plain)
+        .background(index.isMultiple(of: 2) ? Theme.tableGreen : Theme.tableGreenLight)
     }
 
-    private func scoreCell(pts: Int, cumulative: Int, colWidth: CGFloat) -> some View {
-        VStack(spacing: 3) {
-            Group {
-                if pts == 0 {
-                    Text("Won")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.green)
-                } else if pts == RummyRules.drop {
-                    Text("Drop")
-                        .font(.subheadline)
-                        .foregroundStyle(.orange)
-                } else if pts == RummyRules.midDrop {
-                    Text("Mid")
-                        .font(.subheadline)
-                        .foregroundStyle(.orange)
-                } else {
-                    Text("+\(pts)")
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
-                }
-            }
-            Text("\(cumulative)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(width: colWidth)
-    }
-
-    private func totalsRow(game: Game, colWidth: CGFloat) -> some View {
-        let totals = game.totalScores
-        let leader = game.currentLeader
-        return HStack(spacing: 0) {
-            Text("Σ")
-                .frame(width: 48, alignment: .center)
-                .font(.headline.bold())
-                .foregroundStyle(.secondary)
+    private func totalsRowContent(game: Game, totals: [String: Int]) -> some View {
+        HStack(spacing: 0) {
+            tableCell(text: "Tot", width: Theme.rdColWidth, bg: Theme.tableNavy, bold: true)
             ForEach(game.playerNames, id: \.self) { name in
                 let total = totals[name] ?? 0
-                let isOut = total >= RummyRules.outThreshold
-                let isLeading = name == leader
-                VStack(spacing: 4) {
+                let isOut = game.isPlayerOut(name)
+                let isLeader = name == game.currentLeader
+                VStack(spacing: 3) {
                     Text("\(total)")
-                        .font(.title3.bold())
-                        .foregroundStyle(isOut ? .red : isLeading ? .green : .primary)
+                        .font(.headline.bold())
+                        .foregroundStyle(isOut ? .red : isLeader ? Theme.gold : .white)
                     if isOut {
                         Text("OUT")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(.red)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color.red)
                             .clipShape(Capsule())
                     } else {
-                        let left = RummyRules.target - total
-                        Text("\(left) left")
-                            .font(.caption2)
-                            .foregroundStyle(left <= 50 ? .orange : .secondary)
+                        Text("\(game.rules.gameScore - total)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.7))
                     }
                 }
-                .frame(width: colWidth)
+                .frame(width: Theme.playerColWidth, height: 56)
+                .background(Theme.tableGreen)
             }
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 6)
-        .background(Color(.secondarySystemBackground))
     }
 
-    // MARK: - FAB
+    private func scoreCell(pts: Int, game: Game, name: String, roundIndex: Int) -> some View {
+        Text(pts == 0 ? "W" : "\(pts)")
+            .font(.subheadline.bold())
+            .foregroundStyle(pts == 0 ? .green : pts >= game.rules.fullScore ? .red : .white)
+            .frame(width: Theme.playerColWidth, height: 52)
+            .background(roundIndex.isMultiple(of: 2) ? Theme.tableGreen : Theme.tableGreenLight)
+    }
 
-    private var addRoundFAB: some View {
-        Button { showingAddRound = true } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                Text("Add Round")
-                    .fontWeight(.semibold)
-            }
-            .font(.headline)
+    private func tableCell(text: String, width: CGFloat, bg: Color, bold: Bool = false) -> some View {
+        Text(text)
+            .font(bold ? .subheadline.bold() : .subheadline)
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(LinearGradient(colors: [.indigo, .purple],
-                                        startPoint: .leading, endPoint: .trailing))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .indigo.opacity(0.45), radius: 10, y: 4)
+            .frame(width: width, height: 52)
+            .background(bg)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "plus.circle.dashed").font(.largeTitle).foregroundStyle(.white.opacity(0.5))
+            Text("No rounds yet").font(.subheadline).foregroundStyle(.white.opacity(0.7))
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
-        .background(.ultraThinMaterial)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 48)
+    }
+
+    private func winnerBanner(winner: String, rounds: Int) -> some View {
+        HStack(spacing: 14) {
+            Text("🏆").font(.largeTitle)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(winner) wins!").font(.title3.bold()).foregroundStyle(.white)
+                Text("\(rounds) rounds played").font(.caption).foregroundStyle(.white.opacity(0.75))
+            }
+            Spacer()
+        }
+        .padding()
+        .background(Color.black.opacity(0.35))
+    }
+
+    // MARK: - FABs
+
+    private func fabRow(game: Game) -> some View {
+        HStack {
+            // Edit last round (left FAB — coral/red)
+            Button {
+                if let last = game.rounds.last { editingRound = last }
+            } label: {
+                ZStack {
+                    Circle().fill(Color(red: 0.90, green: 0.35, blue: 0.35))
+                        .frame(width: 60, height: 60)
+                        .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+                    Image(systemName: "clipboard.fill")
+                        .font(.title3).foregroundStyle(.white)
+                }
+            }
+            .disabled(game.rounds.isEmpty)
+            .opacity(game.rounds.isEmpty ? 0.4 : 1)
+
+            Spacer()
+
+            // Add round (right FAB — dark)
+            Button {
+                showingAddRound = true
+            } label: {
+                ZStack {
+                    Circle().fill(Theme.buttonDark)
+                        .frame(width: 60, height: 60)
+                        .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+                    Image(systemName: "plus")
+                        .font(.title2.bold()).foregroundStyle(.white)
+                }
+            }
+        }
+        .padding(.horizontal, 32)
+        .padding(.bottom, 24)
     }
 }

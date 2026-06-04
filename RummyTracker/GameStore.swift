@@ -1,12 +1,13 @@
 import Foundation
 import Observation
 
-enum RummyRules {
-    static let maxPlayers = 7
-    static let target = 250
-    static let outThreshold = 251
-    static let drop = 25
-    static let midDrop = 50
+struct GameRules: Codable, Sendable {
+    var drop: Int = 25
+    var midDrop: Int = 50
+    var fullScore: Int = 80
+    var gameScore: Int = 250
+
+    var outThreshold: Int { gameScore + 1 }
 }
 
 struct Round: Codable, Identifiable, Sendable {
@@ -18,6 +19,7 @@ struct Game: Codable, Identifiable, Hashable, Sendable {
     var id: UUID = UUID()
     var createdAt: Date = Date()
     var playerNames: [String]
+    var rules: GameRules = GameRules()
     var rounds: [Round] = []
     var isComplete: Bool = false
 
@@ -40,16 +42,16 @@ struct Game: Codable, Identifiable, Hashable, Sendable {
         guard !rounds.isEmpty else { return nil }
         let totals = totalScores
         return playerNames
-            .filter { (totals[$0] ?? 0) < RummyRules.outThreshold }
+            .filter { (totals[$0] ?? 0) < rules.outThreshold }
             .min(by: { (totals[$0] ?? 0) < (totals[$1] ?? 0) })
     }
 
     func isPlayerOut(_ name: String) -> Bool {
-        (totalScores[name] ?? 0) >= RummyRules.outThreshold
+        (totalScores[name] ?? 0) >= rules.outThreshold
     }
 
     var hasPlayerCrossedTarget: Bool {
-        totalScores.values.contains(where: { $0 >= RummyRules.outThreshold })
+        totalScores.values.contains(where: { $0 >= rules.outThreshold })
     }
 
     func cumulativeScore(for player: String, throughRound roundIndex: Int) -> Int {
@@ -79,11 +81,13 @@ class GameStore {
 
     init() { load() }
 
-    func startGame(playerNames: [String]) {
-        if let index = games.firstIndex(where: { !$0.isComplete }) {
-            games[index].isComplete = true
+    var activeGame: Game? { games.first(where: { !$0.isComplete }) }
+
+    func startGame(playerNames: [String], rules: GameRules = GameRules()) {
+        if let i = games.firstIndex(where: { !$0.isComplete }) {
+            games[i].isComplete = true
         }
-        games.insert(Game(playerNames: playerNames), at: 0)
+        games.insert(Game(playerNames: playerNames, rules: rules), at: 0)
         save()
     }
 
