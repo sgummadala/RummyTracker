@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GameView: View {
     @Environment(GameStore.self) private var store
+    @Environment(ThemeManager.self) private var tm
     let gameId: UUID
 
     @State private var showingAddRound = false
@@ -9,6 +10,7 @@ struct GameView: View {
     @State private var showingEndAlert = false
 
     private var game: Game? { store.games.first(where: { $0.id == gameId }) }
+    private var t: ThemeDefinition { tm.theme }
 
     var body: some View {
         Group {
@@ -19,7 +21,7 @@ struct GameView: View {
     @ViewBuilder
     private func mainContent(game: Game) -> some View {
         ZStack {
-            Theme.gradient.ignoresSafeArea()
+            t.gradient.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 scoreTable(game: game)
@@ -50,6 +52,7 @@ struct GameView: View {
                 currentTotals: game.totalScores
             )
             .environment(store)
+            .environment(tm)
         }
         .sheet(item: $editingRound) { round in
             AddRoundView(
@@ -59,6 +62,7 @@ struct GameView: View {
                 editingRound: round
             )
             .environment(store)
+            .environment(tm)
         }
         .alert("End Game?", isPresented: $showingEndAlert) {
             Button("End Game", role: .destructive) { store.completeGame(gameId) }
@@ -115,7 +119,7 @@ struct GameView: View {
     private func headerRowContent(players: [String], leader: String?, isComplete: Bool,
                                    rdW: CGFloat, pW: CGFloat) -> some View {
         HStack(spacing: 0) {
-            tableCell(text: "Rd.", width: rdW, height: 48, bg: Theme.tableNavy, bold: true)
+            tableCell(text: "Rd.", width: rdW, height: 48, bg: t.tableNavy, bold: true)
             ForEach(players, id: \.self) { name in
                 VStack(spacing: 2) {
                     Text(String(name.prefix(5)))
@@ -126,11 +130,11 @@ struct GameView: View {
                     if name == leader {
                         Image(systemName: isComplete ? "trophy.fill" : "crown.fill")
                             .font(.system(size: 9))
-                            .foregroundStyle(isComplete ? Theme.gold : .yellow)
+                            .foregroundStyle(isComplete ? t.gold : .yellow)
                     }
                 }
                 .frame(width: pW, height: 48)
-                .background(Theme.tableGreen)
+                .background(t.tableGreen)
             }
         }
     }
@@ -153,7 +157,7 @@ struct GameView: View {
                     }
                 }
                 .frame(width: rdW, height: 46)
-                .background(Theme.tableNavy)
+                .background(t.tableNavy)
 
                 ForEach(game.playerNames, id: \.self) { name in
                     let pts = round.scores[name] ?? 0
@@ -161,7 +165,7 @@ struct GameView: View {
                         .font(.system(size: min(14, pW * 0.24), weight: pts == 0 ? .bold : .regular))
                         .foregroundStyle(pts == 0 ? .green : pts >= game.rules.fullScore ? .red : .white)
                         .frame(width: pW, height: 46)
-                        .background(index.isMultiple(of: 2) ? Theme.tableGreen : Theme.tableGreenLight)
+                        .background(index.isMultiple(of: 2) ? t.tableGreen : t.tableGreenLight)
                 }
             }
         }
@@ -171,7 +175,7 @@ struct GameView: View {
     private func totalsRowContent(game: Game, totals: [String: Int],
                                    rdW: CGFloat, pW: CGFloat) -> some View {
         HStack(spacing: 0) {
-            tableCell(text: "Tot", width: rdW, height: 56, bg: Theme.tableNavy, bold: true)
+            tableCell(text: "Tot", width: rdW, height: 56, bg: t.tableNavy, bold: true)
             ForEach(game.playerNames, id: \.self) { name in
                 let total = totals[name] ?? 0
                 let isOut = game.isPlayerOut(name)
@@ -179,7 +183,7 @@ struct GameView: View {
                 VStack(spacing: 2) {
                     Text("\(total)")
                         .font(.system(size: min(15, pW * 0.24), weight: .bold))
-                        .foregroundStyle(isOut ? .red : isLeader ? Theme.gold : .white)
+                        .foregroundStyle(isOut ? .red : isLeader ? t.gold : .white)
                     if isOut {
                         Text("OUT")
                             .font(.system(size: 8, weight: .bold))
@@ -194,7 +198,7 @@ struct GameView: View {
                     }
                 }
                 .frame(width: pW, height: 56)
-                .background(Theme.tableGreen)
+                .background(t.tableGreen)
             }
         }
     }
@@ -256,7 +260,7 @@ struct GameView: View {
                 showingAddRound = true
             } label: {
                 ZStack {
-                    Circle().fill(Theme.buttonDark)
+                    Circle().fill(t.buttonDark)
                         .frame(width: 60, height: 60)
                         .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
                     Image(systemName: "plus")

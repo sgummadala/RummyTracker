@@ -26,6 +26,7 @@ enum ScoreType: Equatable {
 
 struct AddRoundView: View {
     @Environment(GameStore.self) private var store
+    @Environment(ThemeManager.self) private var tm
     @Environment(\.dismiss) private var dismiss
 
     let gameId: UUID
@@ -63,9 +64,11 @@ struct AddRoundView: View {
         activePlayers.filter { resolvedScore(for: $0) == 0 }.count
     }
 
+    private var t: ThemeDefinition { tm.theme }
+
     var body: some View {
         ZStack {
-            Theme.gradient.ignoresSafeArea()
+            t.gradient.ignoresSafeArea()
 
             NavigationStack {
                 ScrollView(.vertical, showsIndicators: true) {
@@ -91,7 +94,7 @@ struct AddRoundView: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button(editingRound == nil ? "Save" : "Update") { saveRound() }
-                            .foregroundStyle(allValid ? Theme.gold : .white.opacity(0.4))
+                            .foregroundStyle(allValid ? t.gold : .white.opacity(0.4))
                             .fontWeight(.bold)
                             .disabled(!allValid)
                     }
@@ -143,7 +146,7 @@ struct AddRoundView: View {
                 if let pts, let type = selected {
                     Text(pts == 0 ? "Won ✓" : "+\(pts)")
                         .font(.title3.bold())
-                        .foregroundStyle(type == .won ? .green : Theme.gold)
+                        .foregroundStyle(type == .won ? .green : t.gold)
                 }
             }
 
@@ -173,7 +176,7 @@ struct AddRoundView: View {
             }
         }
         .padding()
-        .background(Theme.buttonDark)
+        .background(t.buttonDark)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .animation(.easeInOut(duration: 0.18), value: selected)
     }
@@ -208,7 +211,7 @@ struct AddRoundView: View {
 
     private var warningBanner: some View {
         HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.gold)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(t.gold)
             Text(winnerCount == 0 ? "No winner set — one player should score Won"
                                   : "Multiple Won — only one player can win a round")
                 .font(.caption).foregroundStyle(.white.opacity(0.85))

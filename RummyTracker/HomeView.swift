@@ -2,15 +2,18 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(GameStore.self) private var store
+    @Environment(ThemeManager.self) private var tm
     @State private var showingNewGame = false
     @State private var showingPastGames = false
+    @State private var showingThemePicker = false
     @State private var navigateToGameId: UUID?
+
+    private var t: ThemeDefinition { tm.theme }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.gradient.ignoresSafeArea()
-
+                t.gradient.ignoresSafeArea()
                 VStack(spacing: 0) {
                     header
                     Spacer()
@@ -23,24 +26,38 @@ struct HomeView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(Color.white.opacity(0.15))
-                        .clipShape(Circle())
+                    Button { showingThemePicker = true } label: {
+                        Image(systemName: "paintpalette.fill")
+                            .foregroundStyle(.white)
+                            .padding(8)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
+                    }
                 }
             }
             .navigationDestination(for: UUID.self) { gameId in
-                GameView(gameId: gameId).environment(store)
+                GameView(gameId: gameId)
+                    .environment(store)
+                    .environment(tm)
             }
             .navigationDestination(item: $navigateToGameId) { gameId in
-                GameView(gameId: gameId).environment(store)
+                GameView(gameId: gameId)
+                    .environment(store)
+                    .environment(tm)
             }
             .sheet(isPresented: $showingNewGame) {
-                NewGameFlow(navigateToGameId: $navigateToGameId).environment(store)
+                NewGameFlow(navigateToGameId: $navigateToGameId)
+                    .environment(store)
+                    .environment(tm)
             }
             .sheet(isPresented: $showingPastGames) {
-                PastGamesView().environment(store)
+                PastGamesView()
+                    .environment(store)
+                    .environment(tm)
+            }
+            .sheet(isPresented: $showingThemePicker) {
+                ThemePickerView()
+                    .environment(tm)
             }
         }
     }
@@ -68,10 +85,9 @@ struct HomeView: View {
                 icon: "play.fill",
                 title: "Start New Game",
                 subtitle: "Create a new game",
-                isDisabled: false
-            ) {
-                showingNewGame = true
-            }
+                isDisabled: false,
+                t: t
+            ) { showingNewGame = true }
 
             if let active = store.activeGame {
                 NavigationLink(value: active.id) {
@@ -79,16 +95,17 @@ struct HomeView: View {
                         icon: "arrow.clockwise",
                         title: "Current Game Scores",
                         subtitle: "Manage Current Game...",
-                        isDisabled: false
+                        isDisabled: false,
+                        t: t
                     )
                 }
             } else {
-                HomeActionButton(
+                HomeActionButtonLabel(
                     icon: "arrow.clockwise",
                     title: "Current Game Scores",
                     subtitle: "No active game",
                     isDisabled: true,
-                    action: {}
+                    t: t
                 )
             }
 
@@ -96,10 +113,9 @@ struct HomeView: View {
                 icon: "eye.fill",
                 title: "Past Games",
                 subtitle: "View game history",
-                isDisabled: store.games.filter(\.isComplete).isEmpty
-            ) {
-                showingPastGames = true
-            }
+                isDisabled: store.games.filter(\.isComplete).isEmpty,
+                t: t
+            ) { showingPastGames = true }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
@@ -113,11 +129,12 @@ struct HomeActionButton: View {
     let title: String
     let subtitle: String
     let isDisabled: Bool
+    let t: ThemeDefinition
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HomeActionButtonLabel(icon: icon, title: title, subtitle: subtitle, isDisabled: isDisabled)
+            HomeActionButtonLabel(icon: icon, title: title, subtitle: subtitle, isDisabled: isDisabled, t: t)
         }
         .disabled(isDisabled)
     }
@@ -128,30 +145,31 @@ struct HomeActionButtonLabel: View {
     let title: String
     let subtitle: String
     let isDisabled: Bool
+    let t: ThemeDefinition
 
     var body: some View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(isDisabled ? 0.1 : 0.18))
+                    .fill(Color.white.opacity(isDisabled ? 0.08 : 0.18))
                     .frame(width: 52, height: 52)
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundStyle(isDisabled ? .white.opacity(0.4) : .white)
+                    .foregroundStyle(isDisabled ? .white.opacity(0.35) : .white)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(isDisabled ? .white.opacity(0.4) : .white)
+                    .foregroundStyle(isDisabled ? .white.opacity(0.35) : .white)
                 Text(subtitle)
                     .font(.subheadline)
-                    .foregroundStyle(isDisabled ? .white.opacity(0.3) : Theme.gold)
+                    .foregroundStyle(isDisabled ? .white.opacity(0.25) : t.gold)
             }
             Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Theme.buttonDark)
+        .background(t.buttonDark)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
@@ -160,36 +178,51 @@ struct HomeActionButtonLabel: View {
 
 struct PastGamesView: View {
     @Environment(GameStore.self) private var store
+    @Environment(ThemeManager.self) private var tm
     @Environment(\.dismiss) private var dismiss
 
-    var pastGames: [Game] { store.games.filter(\.isComplete) }
+    private var t: ThemeDefinition { tm.theme }
+    private var pastGames: [Game] { store.games.filter(\.isComplete) }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.gradient.ignoresSafeArea()
-                if pastGames.isEmpty {
-                    Text("No completed games yet")
-                        .foregroundStyle(.white.opacity(0.7))
-                } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
+        ZStack {
+            t.gradient.ignoresSafeArea()
+
+            NavigationStack {
+                Group {
+                    if pastGames.isEmpty {
+                        Text("No completed games yet")
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        List {
                             ForEach(pastGames) { game in
-                                PastGameCard(game: game)
+                                PastGameCard(game: game, t: t)
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            store.deleteGameById(game.id)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
                             }
                         }
-                        .padding()
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
                 }
-            }
-            .navigationTitle("Past Games")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.clear, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(.white)
+                .navigationTitle("Past Games")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(.clear, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }
@@ -198,6 +231,7 @@ struct PastGamesView: View {
 
 struct PastGameCard: View {
     let game: Game
+    let t: ThemeDefinition
 
     private var dateString: String {
         let f = DateFormatter()
@@ -210,14 +244,12 @@ struct PastGameCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(game.playerNames.joined(separator: " · "))
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .font(.headline).foregroundStyle(.white).lineLimit(1)
                 Spacer()
                 if let winner = game.winner {
                     HStack(spacing: 4) {
-                        Image(systemName: "trophy.fill").foregroundStyle(Theme.gold)
-                        Text(winner).foregroundStyle(Theme.gold).fontWeight(.semibold)
+                        Image(systemName: "trophy.fill").foregroundStyle(t.gold)
+                        Text(winner).foregroundStyle(t.gold).fontWeight(.semibold)
                     }
                     .font(.caption)
                 }
@@ -229,7 +261,7 @@ struct PastGameCard: View {
             }
         }
         .padding()
-        .background(Theme.buttonDark)
+        .background(t.buttonDark)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }

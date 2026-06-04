@@ -131,6 +131,11 @@ class GameStore {
         save()
     }
 
+    func deleteGameById(_ id: UUID) {
+        games.removeAll { $0.id == id }
+        save()
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(games) {
             UserDefaults.standard.set(data, forKey: storageKey)

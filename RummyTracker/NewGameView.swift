@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Coordinator that manages the Add Players → Set Rules flow
 struct NewGameFlow: View {
     @Environment(GameStore.self) private var store
+    @Environment(ThemeManager.self) private var tm
     @Environment(\.dismiss) private var dismiss
 
     @Binding var navigateToGameId: UUID?
@@ -16,6 +16,8 @@ struct NewGameFlow: View {
             AddPlayersView(players: $players) {
                 path.append("rules")
             }
+            .environment(store)
+            .environment(tm)
             .navigationDestination(for: String.self) { _ in
                 GameRulesView(rules: $rules, players: players) {
                     let names = players
@@ -27,6 +29,7 @@ struct NewGameFlow: View {
                     navigateToGameId = store.activeGame?.id
                     dismiss()
                 }
+                .environment(tm)
             }
         }
     }
