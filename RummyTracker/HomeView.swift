@@ -4,6 +4,7 @@ struct HomeView: View {
     @Environment(GameStore.self) private var store
     @State private var showingNewGame = false
     @State private var showingPastGames = false
+    @State private var navigateToGameId: UUID?
 
     var body: some View {
         NavigationStack {
@@ -32,8 +33,11 @@ struct HomeView: View {
             .navigationDestination(for: UUID.self) { gameId in
                 GameView(gameId: gameId).environment(store)
             }
+            .navigationDestination(item: $navigateToGameId) { gameId in
+                GameView(gameId: gameId).environment(store)
+            }
             .sheet(isPresented: $showingNewGame) {
-                NewGameFlow().environment(store)
+                NewGameFlow(navigateToGameId: $navigateToGameId).environment(store)
             }
             .sheet(isPresented: $showingPastGames) {
                 PastGamesView().environment(store)

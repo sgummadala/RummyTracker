@@ -65,20 +65,18 @@ struct AddRoundView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Theme.gradient.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 14) {
-                        if !outPlayers.isEmpty { outSection }
-                        ForEach(activePlayers, id: \.self) { name in
-                            playerCard(for: name)
-                        }
-                        if allValid && winnerCount != 1 { warningBanner }
+            ScrollView {
+                VStack(spacing: 14) {
+                    if !outPlayers.isEmpty { outSection }
+                    ForEach(activePlayers, id: \.self) { name in
+                        playerCard(for: name)
                     }
-                    .padding()
+                    if allValid && winnerCount != 1 { warningBanner }
                 }
+                .padding()
+                .padding(.bottom, 20)
             }
+            .background(Theme.gradient.ignoresSafeArea())
             .navigationTitle(editingRound == nil ? "Add Round" : "Edit Round")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.clear, for: .navigationBar)
